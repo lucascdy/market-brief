@@ -1,0 +1,76 @@
+name: Brief Marchés
+
+on:
+  schedule:
+    # 8h Paris = 06:00 UTC (été/CEST) ou 07:00 UTC (hiver/CET) — les deux sont programmées,
+    # --only-if-hour dans brief.py ignore silencieusement le mauvais créneau selon la saison.
+    - cron: '0 6 * * 1-5'
+    - cron: '0 7 * * 1-5'
+    # 19h Paris = 17:00 UTC (été/CEST) ou 18:00 UTC (hiver/CET)
+    - cron: '0 17 * * 1-5'
+    - cron: '0 18 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Mode du brief'
+        required: true
+        default: 'matin'
+        type: choice
+        options:
+          - matin
+          - soir
+
+permissions:
+  contents: write
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Déterminer le mode et l'heure cible
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+            echo "hour=" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 6 * * 1-5"|"0 7 * * 1-5")
+                echo "mode=matin" >> "$GITHUB_OUTPUT"
+                echo "hour=8" >> "$GITHUB_OUTPUT"
+                ;;
+              "0 17 * * 1-5"|"0 18 * * 1-5")
+                echo "mode=soir" >> "$GITHUB_OUTPUT"
+                echo "hour=19" >> "$GITHUB_OUTPUT"
+                ;;
+            esac
+          fi
+
+      - name: Générer le brief
+        env:
+          MARKET_BRIEF_SMTP_USER: ${{ secrets.MARKET_BRIEF_SMTP_USER }}
+          MARKET_BRIEF_SMTP_PASSWORD: ${{ secrets.MARKET_BRIEF_SMTP_PASSWORD }}
+          MARKET_BRIEF_EMAIL_TO: ${{ secrets.MARKET_BRIEF_EMAIL_TO }}
+        run: |
+          HOUR_FLAG=""
+          if [ -n "${{ steps.params.outputs.hour }}" ]; then
+            HOUR_FLAG="--only-if-hour ${{ steps.params.outputs.hour }}"
+          fi
+          python brief.py "${{ steps.params.outputs.mode }}" --no-open --no-notify $HOUR_FLAG
+
+      - name: Committer l'historique mis à jour
+        run: |
+          git config user.name "brief-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add briefs/
+          git diff --cached --quiet || git commit -m "Brief $(date -u +%Y-%m-%d)"
+          git push

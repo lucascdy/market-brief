@@ -1,0 +1,15 @@
+{
+  "tickers": {
+    "Technip Energies": "TE.PA",
+    "Smaio": "ALSMA.PA",
+    "Kering": "KER.PA",
+    "TotalEnergies": "TTE.PA",
+    "Aelis Farma": "AELIS.PA",
+    "LVMH": "MC.PA",
+    "Sanofi": "SAN.PA",
+    "Crit": "CEN.PA",
+    "Dassault Systemes": "DSY.PA",
+    "Equasens": "EQS.PA",
+    "Forvia": "FRVIA.PA"
+  }
+}
